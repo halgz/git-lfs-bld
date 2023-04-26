@@ -1,0 +1,45 @@
+#!/bin/bash
+
+
+name=git-lfs
+ver="$(grep -v '^#' version)" || ver=main
+export CGO_CPPFLAGS="-DNDEBUG"
+export CGO_CFLAGS="-O3 -g0"
+export CGO_CXXFLAGS="-O3 -g0"
+export CGO_FFLAGS="-O3 -g0"
+export CGO_LDFLAGS="-O3 -g0"
+
+
+sudo apt-get update >/dev/null 2>&1
+sudo apt-get install -y asciidoctor
+echo ' '
+
+cd gitlfs
+CGO_ENABLED=1 GOAMD64=v3 go build -ldflags="-X github.com/git-lfs/git-lfs/v3/config.GitCommit= -s -w " -gcflags=" " -trimpath
+make man
+
+install -Dm755 ${name} -t ..
+install -Dm644 man/man1/*.1 -t "../DEST/man/man1"
+install -Dm644 man/man5/*.5 -t "../DEST/man/man5"
+install -Dm644 man/html/* -t "../DEST/doc/html"
+install -Dm644 CHANGELOG.md README.md -t "../DEST"
+cd ..
+rm -rf gitlfs
+
+
+create_release() {
+	git config --local user.name 'github-actions'
+	git config --local user.email 'noreply@github.com'
+	git checkout --orphan=release
+	git rm -rf .
+}
+
+git checkout -f release || create_release
+mv DEST/* . || ls -la
+git add git-lfs
+git add man doc CHANGELOG.md README.md
+git commit -m "Release: $ver"
+git tag "$ver"
+git rm git-lfs
+git commit --amend --no-edit
+git push origin release --tags
